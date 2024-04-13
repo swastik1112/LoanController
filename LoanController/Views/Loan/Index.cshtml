@@ -1,0 +1,140 @@
+﻿@{
+    ViewBag.Title = "Loan Calculator";
+}
+
+@using System.Data
+
+<div class="container">
+    <h2>Generate EMI Schedule</h2>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Plan Master</h4>
+            <select id="planDropdown" class="form-control">
+                @foreach (DataRow row in ViewBag.PlanList.Rows)
+                {
+                    <option value="@row["PlanID"]">@row["PlanName"]</option>
+                }
+            </select>
+            <br />
+            <input type="text" id="tenure" class="form-control" placeholder="Tenure" readonly />
+            <br />
+            <input type="text" id="roi" class="form-control" placeholder="ROI" readonly />
+            <br />
+            <input type="number" id="loanAmount" class="form-control" placeholder="Enter Loan Amount" />
+            <br />
+            <input type="date" id="loanDate" class="form-control" placeholder="Loan Date" />
+            <br />
+            <input type="text" id="emi" class="form-control" placeholder="EMI Amount" readonly />
+            <br />
+
+            <button class="btn btn-primary" onclick="calculateEMI()">Calculate EMI</button>
+            <button class="btn btn-success" onclick="generateSchedule()">Generate Schedule</button>
+        </div>
+        <div class="col-md-6">
+            <h4>EMI Schedule</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Emi No.</th>
+                        <th>Due Date</th>
+                        <th>EMI Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTable">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@{
+    ViewBag.Title = "Title";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section scripts {
+    <script>
+        function calculateEMI() {
+    var tenure = parseInt($("#tenure").val());
+    var roi = parseFloat($("#roi").val());
+    var loanAmount = parseFloat($("#loanAmount").val());
+
+    $.ajax({
+        url: '@Url.Action("CalculateEMI", "Loan")',
+        type: 'POST',
+        data: { tenure: tenure, roi: roi, loanAmount: loanAmount },
+        success: function (response) {
+            $("#emi").val(response.emi.toFixed(2));
+            console.log("EMI calculated:", response);
+        },
+        error: function (error) {
+            console.error("Error calculating EMI:", error);
+        }
+    });
+}
+
+function generateSchedule() {
+    var planId = $("#planDropdown").val();
+    var tenure = parseInt($("#tenure").val());
+    var loanDate = $("#loanDate").val();
+    var loanAmount = parseFloat($("#loanAmount").val());
+
+    $.ajax({
+        url: '@Url.Action("GenerateSchedule", "Loan")',
+        type: 'POST',
+        data: { planId: planId, tenure: tenure, loanDate: loanDate, loanAmount: loanAmount },
+        success: function (response) {
+            $("#scheduleTable").empty();
+
+            if (!response || response.length === 0) {
+                alert('No data found.');
+                return;
+            }
+
+            $.each(response, function (index, item) {
+                var emiNo = index + 1;
+                var dueDate = item.DueDate.split('T')[0];
+                var emiAmount = item.EMIAmount.toFixed(2);
+
+                var row = '<tr>' +
+                            '<td>' + emiNo + '</td>' +
+                            '<td>' + dueDate + '</td>' +
+                            '<td>' + emiAmount + '</td>' +
+                          '</tr>';
+
+                $("#scheduleTable").append(row);
+            });
+
+            alert('EMI Schedule Generated Successfully');
+            console.log("EMI Schedule generated:", response);
+        },
+        error: function (error) {
+            alert('Error generating EMI Schedule');
+            console.error("Error generating EMI Schedule:", error);
+        }
+    });
+}
+
+$(document).ready(function () {
+    $("#planDropdown").change(function () {
+        var planId = $(this).val();
+
+        $.ajax({
+            url: '@Url.Action("GetPlanDetails", "Loan")',
+            type: 'GET',
+            data: { planId: planId },
+            success: function (response) {
+                $("#tenure").val(response.Tenure);
+                $("#roi").val(response.ROI);
+                console.log("Plan details:", response);
+            },
+            error: function (error) {
+                console.error("Error fetching plan details:", error);
+            }
+        });
+    });
+});
+
+    </script>
+}
